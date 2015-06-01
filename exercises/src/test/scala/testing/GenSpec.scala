@@ -1,4 +1,5 @@
 import org.specs2.mutable.Specification
+import org.specs2.ScalaCheck
 
 import fpinscala.state.RNG
 import fpinscala.testing._
@@ -28,11 +29,13 @@ Properties that specify an implementation of maximum: List[Int] => Int
   3. xs: List[Int] => maximum(xs) == maximum(xs.reverse)
 */
 
-class GenSpec extends Specification {
+class GenSpec extends Specification with ScalaCheck {
   val simpleRng = RNG.Simple(1)
   val pPass = new Prop { def check = Right(1) }
   val leftFail = Left("Fail" -> 1)
   val pFail = new Prop { def check = leftFail }
+
+  def genRun[A](g: Gen[A]): A = g.sample.run(simpleRng)._1
 
   "Prop#&&" should {
     "result in true if all individual Props result in true" in {
@@ -49,14 +52,34 @@ class GenSpec extends Specification {
     "return a number within the given range" in {
       val start = 0
       val stopExclusive = 10
-      val (num, _) =
-        Gen
-          .choose(start, stopExclusive)
-          .asInstanceOf[GenST[Int]]
-          .sample
-          .run(simpleRng)
+      val num = genRun(Gen.choose(start, stopExclusive))
 
       num must beBetween(start, stopExclusive).excludingEnd
+    }
+  }
+
+  "Gen.unit" should {
+    "always result in its input value" in {
+      prop { inputVal: Int =>
+        val num = genRun(Gen.unit(inputVal))
+        num mustEqual inputVal
+      }
+    }
+  }
+
+  "Gen.boolean" should {
+    "always result in true or false" in {
+      Seq(true, false) must contain(genRun(Gen.boolean))
+    }
+  }
+
+  "Gen.listOfN" should {
+    "result in a list of the given size" in {
+      val n = 5
+      val g = Gen.unit(1)
+      val listGen = Gen.listOfN(n, g)
+
+      genRun(listGen).length mustEqual n
     }
   }
 }

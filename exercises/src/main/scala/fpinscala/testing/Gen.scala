@@ -38,7 +38,16 @@ object Prop {
 }
 
 object Gen {
-  def unit[A](a: => A): Gen[A] = ???
+  def unit[A](a: => A): Gen[A] = Gen(State.unit(a))
+
+  def boolean: Gen[Boolean] =
+    choose(0, 2).map {
+      case 0 => false
+      case 1 => true
+    }
+
+  def listOfN[A](n: Int, g: Gen[A]): Gen[List[A]] =
+    Gen(State.sequence(List.fill(n)(g.sample)))
 
   def choose(start: Int, stopExclusive: Int): Gen[Int] = {
     def betweenStartStop(rng: RNG): (Int, RNG) = {
@@ -49,16 +58,15 @@ object Gen {
     }
     val sample = State(betweenStartStop)
 
-    GenST(sample)
+    Gen(sample)
   }
 }
 
-trait Gen[A] {
-  def map[A,B](f: A => B): Gen[B] = ???
-  def flatMap[A,B](f: A => Gen[B]): Gen[B] = ???
-}
+case class Gen[A](sample: State[RNG, A]) {
+  def map[B](f: A => B): Gen[B] = Gen(sample.map(f))
 
-case class GenST[A](sample: State[RNG, A]) extends Gen[A]
+  def flatMap[B](f: A => Gen[B]): Gen[B] = ???
+}
 
 trait SGen[+A] {
 
