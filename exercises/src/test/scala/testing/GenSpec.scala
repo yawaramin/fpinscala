@@ -35,6 +35,9 @@ class GenSpec extends Specification with ScalaCheck {
   val leftFail = Left("Fail" -> 1)
   val pFail = new Prop { def check = leftFail }
 
+  val n = 5
+  val gen1 = Gen.unit(1)
+
   def genRun[A](g: Gen[A]): A = g.sample.run(simpleRng)._1
 
   "Prop#&&" should {
@@ -75,10 +78,14 @@ class GenSpec extends Specification with ScalaCheck {
 
   "Gen.listOfN" should {
     "result in a list of the given size" in {
-      val n = 5
-      val g = Gen.unit(1)
-      val listGen = Gen.listOfN(n, g)
+      val listGen = Gen.listOfN(n, gen1)
+      genRun(listGen).length mustEqual n
+    }
+  }
 
+  "Gen.listOfNDynamic" should {
+    "result in a list of the given size" in {
+      val listGen = gen1.listOfNDynamic(Gen.unit(n))
       genRun(listGen).length mustEqual n
     }
   }
