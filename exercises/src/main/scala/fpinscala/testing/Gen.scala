@@ -60,6 +60,13 @@ object Gen {
 
     Gen(sample)
   }
+
+  def union[A](g1: Gen[A], g2: Gen[A]): Gen[A] =
+    g1.flatMap { a1 =>
+      g2.flatMap { a2 =>
+        boolean.flatMap { chooseA1 => unit(if (chooseA1) a1 else a2) }
+      }
+    }
 }
 
 case class Gen[A](sample: State[RNG, A]) {

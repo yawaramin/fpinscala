@@ -89,5 +89,14 @@ class GenSpec extends Specification with ScalaCheck {
       genRun(listGen).length mustEqual n
     }
   }
+
+  "Gen.union" should {
+    "create a Gen which combines its input Gens" in {
+      val gen2 = Gen.unit(2)
+      val gen12 = Gen.union(gen1, gen2)
+
+      Seq(1, 2) must contain(genRun(gen12))
+    }
+  }
 }
 
