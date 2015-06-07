@@ -37,6 +37,7 @@ class GenSpec extends Specification with ScalaCheck {
 
   val n = 5
   val gen1 = Gen.unit(1)
+  val gen2 = Gen.unit(2)
 
   def genRun[A](g: Gen[A]): A = g.sample.run(simpleRng)._1
 
@@ -91,10 +92,15 @@ class GenSpec extends Specification with ScalaCheck {
   }
 
   "Gen.union" should {
-    "create a Gen which combines its input Gens" in {
-      val gen2 = Gen.unit(2)
+    "create a Gen which combines its input Gens with equal probability" in {
       val gen12 = Gen.union(gen1, gen2)
+      Seq(1, 2) must contain(genRun(gen12))
+    }
+  }
 
+  "Gen.weighted" should {
+    "create a Gen which combines its input Gens with weighted probability" in {
+      val gen12 = Gen.weighted(gen1 -> 0.5, gen2 -> 0.5)
       Seq(1, 2) must contain(genRun(gen12))
     }
   }

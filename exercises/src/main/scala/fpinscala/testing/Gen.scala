@@ -67,6 +67,21 @@ object Gen {
         boolean.flatMap { chooseA1 => unit(if (chooseA1) a1 else a2) }
       }
     }
+
+  def weighted
+    [A]
+    (g1: (Gen[A], Double), g2: (Gen[A], Double)):
+    Gen[A] = {
+    val genDouble = Gen(State(RNG.double))
+    val (g1Abs, g2Abs) = (g1._2.abs, g2._2.abs)
+    val g1Prob = g1Abs / (g1Abs + g2Abs)
+
+    g1._1.flatMap { a1 =>
+      g2._1.flatMap { a2 =>
+        genDouble.flatMap { d => unit(if (d >= g1Prob) a1 else a2) }
+      }
+    }
+  }
 }
 
 case class Gen[A](sample: State[RNG, A]) {
