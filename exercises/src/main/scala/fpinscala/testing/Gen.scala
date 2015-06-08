@@ -18,7 +18,11 @@ object Result {
   private type SuccessCount = Int
 
   sealed trait T
+
   case object Passed extends T
+
+  case object Proved extends T
+
   case class Falsified(
     failure: FailedCase,
     successes: SuccessCount
@@ -27,12 +31,13 @@ object Result {
   def isFalsified(t: T): Boolean =
     t match {
       case Passed => false
+      case Proved => false
       case Falsified(_, _) => true
     }
 }
 
 object Prop {
-  import Result.{ Passed, Falsified }
+  import Result.{ Proved, Passed, Falsified }
 
   private type TestCases = Int
   private type MaxSize = Int
@@ -78,13 +83,29 @@ object Prop {
         }.find(Result.isFalsified(_)).getOrElse(Passed)
     }
 
+  def check(p: => Boolean): T =
+    T { (_, _, _) => if (p) Proved else Falsified("()", 0) }
+
+  val S =
+    Gen.weighted(
+      Gen.choose(1, 4).map(Executors.newFixedThreadPool) -> 0.75,
+      Gen.unit(Executors.newCachedThreadPool) -> 0.25
+    )
+
+  def forAllPar[A](g: Gen[A])(f: A => Par[Boolean]): T =
+    forAll(S ** g) { case (s, a) => f(a)(s).get }
+
   def and(p1: T, p2: T): T =
     T { (max, n, rng) =>
       val r1 = p1.run(max, n, rng)
       val r2 = p2.run(max, n, rng)
 
       (r1, r2) match {
+        case (Proved, Proved) => Proved
         case (Passed, Passed) => Passed
+        case (Passed, Proved) => Passed
+        case (Proved, Passed) => Passed
+        case (Proved, Falsified(_, _)) => r2
         case (Passed, Falsified(_, _)) => r2
         case (Falsified(_, _), _) => r1
       }
@@ -96,6 +117,8 @@ object Prop {
       val r2 = p2.run(max, n, rng)
 
       (r1, r2) match {
+        case (Proved, _) => Proved
+        case (_, Proved) => Proved
         case (Passed, _) => Passed
         case (_, Passed) => Passed
         case (_, _) => r1
@@ -112,6 +135,7 @@ object Prop {
       case Falsified(msg, n) =>
         println(s"! Falsified after $n passed tests:\n $msg")
       case Passed => println(s"+ OK, passed $testCases tests.")
+      case Proved => println(s"+ OK, proved property.")
     }
 }
 
@@ -170,8 +194,13 @@ case class Gen[A](sample: State[RNG, A]) {
   def flatMap[B](f: A => Gen[B]): Gen[B] =
     Gen(sample.flatMap(f(_).sample))
 
+  def map2[B, C](g: Gen[B])(f: (A, B) => C): Gen[C] =
+    Gen(sample.map2(g.sample)(f))
+
   def listOfNDynamic(size: Gen[Int]): Gen[List[A]] =
     size.flatMap(listOfN(_, this))
+
+  def **[B](g: Gen[B]): Gen[(A, B)] = map2(g)(_ -> _)
 }
 
 object SGen {
@@ -219,5 +248,29 @@ object ListProps {
         ) &&
         ns.toSet == nsSorted.toSet
     }
+}
+
+object ParProps {
+  def equal[A](p1: Par[A], p2: Par[A]): Par[Boolean] =
+    Par.map2(p1, p2) { _ == _ }
+
+  def checkPar(p: => Par[Boolean]): Prop.T =
+    Prop.forAllPar(Gen.unit(()))(_ => p)
+
+  val pInt = Gen.choose(0, 10).map(Par.unit(_))
+
+  val pIntPar = {
+    val genInt = Gen.choose(0, 10)
+
+    genInt.listOfNDynamic(genInt).map { xs =>
+      xs.foldLeft(Par.unit(0)) { (p, i) =>
+        Par.fork { Par.map2(p, Par.unit(i))(_ + _) }
+      }
+    }
+  }
+
+  val p2 = checkPar(equal(Par.map(Par.unit(1))(_ + 1), Par.unit(2)))
+
+  val p4 = Prop.forAllPar(pInt) { n => equal(Par.map(n)(identity), n) }
 }
 
