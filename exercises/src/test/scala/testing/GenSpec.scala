@@ -36,20 +36,21 @@ class GenSpec extends Specification with ScalaCheck {
   val gen1 = Gen.unit(1)
   val gen2 = Gen.unit(2)
 
-  val prop1 = Prop.T { (tcs, rng) => Result.Passed }
-  val prop2 = Prop.T { (tcs, rng) => Result.Falsified("falsified", 0) }
+  val prop1 = Prop.T { (max, tcs, rng) => Result.Passed }
+  val prop2 =
+    Prop.T { (max, tcs, rng) => Result.Falsified("falsified", 0) }
 
   def genRun[A](g: Gen[A]): A = g.sample.run(simpleRng)._1
 
   "Prop.and" should {
     "result in Passed if all individual Props result in Passed" in {
-      Result.isFalsified(Prop.and(prop1, prop1).run(1, simpleRng)) must {
+      Result.isFalsified(Prop.and(prop1, prop1).run(1, 1, simpleRng)) must {
         beFalse
       }
     }
 
     "result in Falsified if some individual Props result in Falsified" in {
-      Result.isFalsified(Prop.and(prop1, prop2).run(1, simpleRng)) must {
+      Result.isFalsified(Prop.and(prop1, prop2).run(1, 1, simpleRng)) must {
         beTrue
       }
     }
@@ -57,21 +58,21 @@ class GenSpec extends Specification with ScalaCheck {
 
   "Prop.or" should {
     "result in Passed if some individual Props result in Passed" in {
-      Result.isFalsified(Prop.or(prop1, prop1).run(1, simpleRng)) must {
+      Result.isFalsified(Prop.or(prop1, prop1).run(1, 1, simpleRng)) must {
         beFalse
       }
 
-      Result.isFalsified(Prop.or(prop1, prop2).run(1, simpleRng)) must {
+      Result.isFalsified(Prop.or(prop1, prop2).run(1, 1, simpleRng)) must {
         beFalse
       }
 
-      Result.isFalsified(Prop.or(prop2, prop1).run(1, simpleRng)) must {
+      Result.isFalsified(Prop.or(prop2, prop1).run(1, 1, simpleRng)) must {
         beFalse
       }
     }
 
     "result in Falsified if all individual Props result in Falsified" in {
-      Result.isFalsified(Prop.or(prop2, prop2).run(1, simpleRng)) must {
+      Result.isFalsified(Prop.or(prop2, prop2).run(1, 1, simpleRng)) must {
         beTrue
       }
     }
@@ -137,5 +138,36 @@ class GenSpec extends Specification with ScalaCheck {
       }
     }
   }
+
+  "SGen.listOf" should {
+    "result in a list which can be given a size" in {
+      val sz = 5
+      genRun(SGen.listOf(gen1).forSize(sz)).length mustEqual sz
+    }
+  }
+
+  "SGen.listOf1" should {
+    "result in a non-empty list which can be given a size" in {
+      genRun(SGen.listOf1(gen1).forSize(0)).length mustEqual 1
+    }
+  }
+
+  /*
+  "ListProps.sortedProp" should {
+    "verify List.sorted" in {
+      ListProps.sortedProp.run(10, 10, simpleRng) mustEqual {
+        Result.Passed
+      }
+    }
+  }
+
+  "ListProps.takeWhileDropWhileProp" should {
+    "verify relationship between List.takeWhile and List.dropWhile" in {
+      ListProps.takeWhileDropWhileProp.run(10, 10, simpleRng) mustEqual {
+        Result.Passed
+      }
+    }
+  }
+  */
 }
 
