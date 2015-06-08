@@ -151,5 +151,15 @@ class GenSpec extends Specification with ScalaCheck {
       genRun(SGen.listOf1(gen1).forSize(0)).length mustEqual 1
     }
   }
+
+  /*
+  "ListProps.sortedProp" should {
+    "verify List.sorted" in {
+      ListProps.sortedProp.run(10, 10, simpleRng) mustEqual {
+        Result.Passed
+      }
+    }
+  }
+  */
 }
 

@@ -205,5 +205,19 @@ object ListProps {
       val max = ns.max
       !ns.exists(_ > max)
     }
+
+  val sortedProp =
+    Prop.forAll(SGen.listOf(smallInt)) { ns =>
+      val nsSorted = ns.sorted
+
+      ns.length == nsSorted.length &&
+        (ns.isEmpty ||
+          nsSorted.tail.isEmpty ||
+          !nsSorted
+            .zip(nsSorted.tail)
+            .exists { case (a, b) => a > b }
+        ) &&
+        ns.toSet == nsSorted.toSet
+    }
 }
 
