@@ -272,5 +272,7 @@ object ParProps {
   val p2 = checkPar(equal(Par.map(Par.unit(1))(_ + 1), Par.unit(2)))
 
   val p4 = Prop.forAllPar(pInt) { n => equal(Par.map(n)(identity), n) }
+
+  val pFork = Prop.forAllPar(pInt) { n => equal(n, Par.fork(n)) }
 }
 
