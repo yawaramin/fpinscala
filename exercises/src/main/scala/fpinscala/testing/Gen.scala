@@ -186,6 +186,9 @@ object SGen {
   def unit[A](a: => A): T[A] = Gen.unsized(Gen.unit(a))
 
   def listOf[A](g: Gen[A]): T[List[A]] = T(Gen.listOfN(_, g))
+
+  def listOf1[A](g: Gen[A]): T[List[A]] =
+    T { sz => Gen.listOfN(sz.max(1), g) }
 }
 
 object ListProps {
@@ -193,6 +196,12 @@ object ListProps {
 
   val maxProp =
     Prop.forAll(SGen.listOf(smallInt)) { ns =>
+      val max = ns.max
+      !ns.exists(_ > max)
+    }
+
+  val maxProp1 =
+    Prop.forAll(SGen.listOf1(smallInt)) { ns =>
       val max = ns.max
       !ns.exists(_ > max)
     }
