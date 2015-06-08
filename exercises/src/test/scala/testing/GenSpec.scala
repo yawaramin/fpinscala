@@ -31,24 +31,49 @@ Properties that specify an implementation of maximum: List[Int] => Int
 
 class GenSpec extends Specification with ScalaCheck {
   val simpleRng = RNG.Simple(1)
-  val pPass = new Prop { def check = Right(1) }
-  val leftFail = Left("Fail" -> 1)
-  val pFail = new Prop { def check = leftFail }
 
   val n = 5
   val gen1 = Gen.unit(1)
   val gen2 = Gen.unit(2)
 
+  val prop1 = Prop.T { (tcs, rng) => Result.Passed }
+  val prop2 = Prop.T { (tcs, rng) => Result.Falsified("falsified", 0) }
+
   def genRun[A](g: Gen[A]): A = g.sample.run(simpleRng)._1
 
-  "Prop#&&" should {
-    "result in true if all individual Props result in true" in {
-      val p = new Prop { def check = Right(1) }
-      (pPass && p).check mustEqual Right(2)
+  "Prop.and" should {
+    "result in Passed if all individual Props result in Passed" in {
+      Result.isFalsified(Prop.and(prop1, prop1).run(1, simpleRng)) must {
+        beFalse
+      }
     }
 
-    "result in false if some individual Props result in false" in {
-      (pPass && pFail).check mustEqual leftFail
+    "result in Falsified if some individual Props result in Falsified" in {
+      Result.isFalsified(Prop.and(prop1, prop2).run(1, simpleRng)) must {
+        beTrue
+      }
+    }
+  }
+
+  "Prop.or" should {
+    "result in Passed if some individual Props result in Passed" in {
+      Result.isFalsified(Prop.or(prop1, prop1).run(1, simpleRng)) must {
+        beFalse
+      }
+
+      Result.isFalsified(Prop.or(prop1, prop2).run(1, simpleRng)) must {
+        beFalse
+      }
+
+      Result.isFalsified(Prop.or(prop2, prop1).run(1, simpleRng)) must {
+        beFalse
+      }
+    }
+
+    "result in Falsified if all individual Props result in Falsified" in {
+      Result.isFalsified(Prop.or(prop2, prop2).run(1, simpleRng)) must {
+        beTrue
+      }
     }
   }
 

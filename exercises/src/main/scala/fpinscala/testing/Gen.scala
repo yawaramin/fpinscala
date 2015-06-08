@@ -13,28 +13,77 @@ The library developed in this chapter goes through several iterations. This file
 shell, which you can fill in and modify while working through the chapter.
 */
 
-trait Prop {
-  def check: Either[(FailedCase, SuccessCount), SuccessCount]
+object Result {
+  private type FailedCase = String
+  private type SuccessCount = Int
 
-  def &&(p: Prop): Prop =
-    new Prop {
-      def check =
-        Prop.this.check match {
-          case Left(a) => Left(a)
-          case Right(b) =>
-            p.check match {
-              case Left(a) => Left(a)
-              case Right(b2) => Right(b + b2)
-            }
-        }
+  sealed trait T
+  case object Passed extends T
+  case class Falsified(
+    failure: FailedCase,
+    successes: SuccessCount
+  ) extends T
+
+  def isFalsified(t: T): Boolean =
+    t match {
+      case Passed => false
+      case Falsified(_, _) => true
     }
 }
 
 object Prop {
-  type FailedCase = String
-  type SuccessCount = Int
+  import Result.{ Passed, Falsified }
 
-  def forAll[A](gen: Gen[A])(f: A => Boolean): Prop = ???
+  private type TestCases = Int
+  case class T(run: (TestCases, RNG) => Result.T)
+
+  private def randomStream[A](g: Gen[A])(rng: RNG): Stream[A] =
+    Stream.unfold(rng)(rng => Option(g.sample.run(rng)))
+
+  private def buildMsg[A](s: A, e: Exception): String =
+    s"test case: $s\n" +
+    s"generated an exception: ${e.getMessage}\n" +
+    s"stack trace:\n ${e.getStackTrace.mkString("\n")}"
+
+  def forAll[A](as: Gen[A])(f: A => Boolean): T =
+    T { (n, rng) =>
+      Stream
+        .zipWith(randomStream(as)(rng), Stream.from(0)) { case (a, b) =>
+          a -> b
+        }.take(n)
+        .map {
+        case (a, i) =>
+          try {
+            if (f(a)) Passed else Falsified(a.toString, i)
+          } catch {
+            case e: Exception => Falsified(buildMsg(a, e), i)
+          }
+      }.find(Result.isFalsified(_)).getOrElse(Passed)
+    }
+
+  def and(p1: T, p2: T): T =
+    T { (n, rng) =>
+      val r1 = p1.run(n, rng)
+      val r2 = p2.run(n, rng)
+
+      (r1, r2) match {
+        case (Passed, Passed) => Passed
+        case (Passed, Falsified(_, _)) => r2
+        case (Falsified(_, _), _) => r1
+      }
+    }
+
+  def or(p1: T, p2: T): T =
+    T { (n, rng) =>
+      val r1 = p1.run(n, rng)
+      val r2 = p2.run(n, rng)
+
+      (r1, r2) match {
+        case (Passed, _) => Passed
+        case (_, Passed) => Passed
+        case (_, _) => r1
+      }
+    }
 }
 
 object Gen {
