@@ -248,6 +248,24 @@ object ListProps {
         ) &&
         ns.toSet == nsSorted.toSet
     }
+
+  private def isEven(n: Int) = n % 2 == 0
+  private val genListInt = SGen.listOf(smallInt)
+
+  val takeWhileProp = {
+    Prop.forAll(genListInt) { ns =>
+      ns.takeWhile(_ => true) == ns &&
+        ns.takeWhile(_ => false) == List.empty &&
+        ns.takeWhile(isEven).forall(isEven)
+    }
+  }
+
+  val takeWhileDropWhileProp = {
+    Prop.forAll(genListInt) { ns =>
+      val partitionedLists = ns.partition(isEven)
+      partitionedLists == ns.takeWhile(isEven) -> ns.dropWhile(isEven)
+    }
+  }
 }
 
 object ParProps {

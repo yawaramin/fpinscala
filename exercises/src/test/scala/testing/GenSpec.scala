@@ -160,6 +160,14 @@ class GenSpec extends Specification with ScalaCheck {
       }
     }
   }
+
+  "ListProps.takeWhileDropWhileProp" should {
+    "verify relationship between List.takeWhile and List.dropWhile" in {
+      ListProps.takeWhileDropWhileProp.run(10, 10, simpleRng) mustEqual {
+        Result.Passed
+      }
+    }
+  }
   */
 }
 
