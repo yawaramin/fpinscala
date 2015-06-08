@@ -137,5 +137,12 @@ class GenSpec extends Specification with ScalaCheck {
       }
     }
   }
+
+  "SGen.listOf" should {
+    "result in a list which can be given a size" in {
+      val sz = 5
+      genRun(SGen.listOf(gen1).forSize(sz)).length mustEqual sz
+    }
+  }
 }
 

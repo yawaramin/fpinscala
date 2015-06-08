@@ -35,7 +35,9 @@ object Prop {
   import Result.{ Passed, Falsified }
 
   private type TestCases = Int
-  case class T(run: (TestCases, RNG) => Result.T)
+  private type MaxSize = Int
+
+  case class T(run: (MaxSize, TestCases, RNG) => Result.T)
 
   private def randomStream[A](g: Gen[A])(rng: RNG): Stream[A] =
     Stream.unfold(rng)(rng => Option(g.sample.run(rng)))
@@ -45,26 +47,41 @@ object Prop {
     s"generated an exception: ${e.getMessage}\n" +
     s"stack trace:\n ${e.getStackTrace.mkString("\n")}"
 
+  def forAll[A](g: SGen.T[A])(f: A => Boolean): T =
+    forAll(g.forSize(_))(f)
+
+  def forAll[A](g: Int => Gen[A])(f: A => Boolean): T =
+    T { (max, n, rng) =>
+      val casesPerSize = (n + (max - 1)) / max
+      val props =
+        Stream.from(0).take(n.min(max) + 1).map(i => forAll(g(i))(f))
+      val prop =
+        props.map { p =>
+          T { (max, _, rng) => p.run(max, casesPerSize, rng) }
+        }.toList.reduce(and)
+
+      prop.run(max, n, rng)
+    }
+
   def forAll[A](as: Gen[A])(f: A => Boolean): T =
-    T { (n, rng) =>
+    T { (_, n, rng) =>
       Stream
         .zipWith(randomStream(as)(rng), Stream.from(0)) { case (a, b) =>
           a -> b
         }.take(n)
-        .map {
-        case (a, i) =>
+        .map { case (a, i) =>
           try {
             if (f(a)) Passed else Falsified(a.toString, i)
           } catch {
             case e: Exception => Falsified(buildMsg(a, e), i)
           }
-      }.find(Result.isFalsified(_)).getOrElse(Passed)
+        }.find(Result.isFalsified(_)).getOrElse(Passed)
     }
 
   def and(p1: T, p2: T): T =
-    T { (n, rng) =>
-      val r1 = p1.run(n, rng)
-      val r2 = p2.run(n, rng)
+    T { (max, n, rng) =>
+      val r1 = p1.run(max, n, rng)
+      val r2 = p2.run(max, n, rng)
 
       (r1, r2) match {
         case (Passed, Passed) => Passed
@@ -74,15 +91,27 @@ object Prop {
     }
 
   def or(p1: T, p2: T): T =
-    T { (n, rng) =>
-      val r1 = p1.run(n, rng)
-      val r2 = p2.run(n, rng)
+    T { (max, n, rng) =>
+      val r1 = p1.run(max, n, rng)
+      val r2 = p2.run(max, n, rng)
 
       (r1, r2) match {
         case (Passed, _) => Passed
         case (_, Passed) => Passed
         case (_, _) => r1
       }
+    }
+
+  def run(
+    t: T,
+    maxSize: Int = 100,
+    testCases: Int = 100,
+    rng: RNG = RNG.Simple(System.currentTimeMillis)
+  ): Unit =
+    t.run(maxSize, testCases, rng) match {
+      case Falsified(msg, n) =>
+        println(s"! Falsified after $n passed tests:\n $msg")
+      case Passed => println(s"+ OK, passed $testCases tests.")
     }
 }
 
@@ -155,5 +184,17 @@ object SGen {
     T(t.forSize andThen (_.flatMap(f)))
 
   def unit[A](a: => A): T[A] = Gen.unsized(Gen.unit(a))
+
+  def listOf[A](g: Gen[A]): T[List[A]] = T(Gen.listOfN(_, g))
+}
+
+object ListProps {
+  private val smallInt = Gen.choose(-10, 10)
+
+  val maxProp =
+    Prop.forAll(SGen.listOf(smallInt)) { ns =>
+      val max = ns.max
+      !ns.exists(_ > max)
+    }
 }
 
