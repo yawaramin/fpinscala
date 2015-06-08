@@ -145,5 +145,15 @@ case class Gen[A](sample: State[RNG, A]) {
     size.flatMap(listOfN(_, this))
 }
 
-object SGen { case class T[A](forSize: Int => Gen[A]) }
+object SGen {
+  case class T[A](forSize: Int => Gen[A])
+
+  def map[A, B](t: T[A])(f: A => B): T[B] =
+    T(t.forSize andThen (_.map(f)))
+
+  def flatMap[A, B](t: T[A])(f: A => Gen[B]): T[B] =
+    T(t.forSize andThen (_.flatMap(f)))
+
+  def unit[A](a: => A): T[A] = Gen.unsized(Gen.unit(a))
+}
 
