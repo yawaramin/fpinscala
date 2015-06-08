@@ -129,5 +129,13 @@ class GenSpec extends Specification with ScalaCheck {
       Seq(1, 2) must contain(genRun(gen12))
     }
   }
+
+  "Gen.unsized" should {
+    "convert an SGen to a Gen" in {
+      prop { sz: Int =>
+        Gen.unsized(gen1).forSize(sz) mustEqual gen1
+      }
+    }
+  }
 }
 

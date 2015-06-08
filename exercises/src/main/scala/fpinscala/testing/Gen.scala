@@ -131,6 +131,8 @@ object Gen {
       }
     }
   }
+
+  def unsized[A](gen: Gen[A]): SGen.T[A] = SGen.T { sz => gen }
 }
 
 case class Gen[A](sample: State[RNG, A]) {
@@ -143,7 +145,5 @@ case class Gen[A](sample: State[RNG, A]) {
     size.flatMap(listOfN(_, this))
 }
 
-trait SGen[+A] {
-
-}
+object SGen { case class T[A](forSize: Int => Gen[A]) }
 
