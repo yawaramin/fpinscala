@@ -66,9 +66,17 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
     def mapLaw[A](p: Parser[A])(in: Gen[String]): Prop =
       equal(p, p.map(identity))(in)
 
-    def succeedLaw[A]: Prop =
+    val succeedLaw: Prop =
       forAll { (a: String, in: String) =>
         run(succeed(a))(in) == Right(a)
+      }
+
+    def productLaw
+      [A, B, C]
+      (pa: Parser[A], pb: Parser[B], pc: Parser[C]):
+      Prop =
+      forAll { in: String =>
+        run(pa ** pb)(in) == (run(pa)(in), run(pb)(in))
       }
   }
 }
