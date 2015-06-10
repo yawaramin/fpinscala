@@ -24,7 +24,8 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
   */
   def succeed[A](a: A): Parser[A] = string("").map(_ => a)
 
-  def many[A](p: Parser[A]): Parser[List[A]]
+  def many[A](p: Parser[A]): Parser[List[A]] =
+    map2(p, many(p))(_ :: _) or succeed(List.empty)
 
   def many1[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(_ :: _)
 
