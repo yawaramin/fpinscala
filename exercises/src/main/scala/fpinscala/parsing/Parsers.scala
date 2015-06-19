@@ -71,14 +71,6 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
       forAll { (a: String, in: String) =>
         run(succeed(a))(in) == Right(a)
       }
-
-    def productLaw
-      [A, B, C]
-      (pa: Parser[A], pb: Parser[B], pc: Parser[C]):
-      Prop =
-      forAll { in: String =>
-        run(pa ** pb)(in) == (run(pa)(in), run(pb)(in))
-      }
   }
 }
 
