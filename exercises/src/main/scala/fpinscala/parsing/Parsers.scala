@@ -4,6 +4,8 @@ import java.util.regex._
 import scala.util.matching.Regex
 
 trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call methods of trait
+  private def listCons[A](a: A, as: List[A]): List[A] = a :: as
+
   def run[A](p: Parser[A])(input: String): Either[ParseError, A]
 
   implicit def string(s: String): Parser[String]
@@ -25,9 +27,10 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
   def succeed[A](a: A): Parser[A] = string("").map(_ => a)
 
   def many[A](p: Parser[A]): Parser[List[A]] =
-    map2(p, many(p))(_ :: _) or succeed(List.empty)
+    map2(p, many(p))(listCons) or succeed(List.empty)
 
-  def many1[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(_ :: _)
+  def many1[A](p: Parser[A]): Parser[List[A]] =
+    map2(p, many(p))(listCons)
 
   def map[A, B](p: Parser[A])(f: A => B): Parser[B]
 
@@ -44,7 +47,9 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
 
   def slice[A](p: Parser[A]): Parser[String]
 
-  def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]]
+  def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]] =
+    if (n < 1) succeed(List.empty)
+    else map2(p, listOfN(n - 1, p))(listCons)
 
   case class ParserOps[A](p: Parser[A]) {
     def |[B >: A](p2: Parser[B]) = self.or(p, p2)
