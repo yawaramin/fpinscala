@@ -9,6 +9,9 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
   def run[A](p: Parser[A])(input: String): Either[ParseError, A]
 
   implicit def string(s: String): Parser[String]
+
+  implicit def regex(r: Regex): Parser[String]
+
   implicit def operators[A](p: Parser[A]) = ParserOps[A](p)
 
   implicit def asStringParser
@@ -34,13 +37,13 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
 
   def map[A, B](p: Parser[A])(f: A => B): Parser[B]
 
-  def or[A](p1: Parser[A], p2: Parser[A]): Parser[A]
+  def or[A](p1: Parser[A], p2: => Parser[A]): Parser[A]
 
-  def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)]
+  def product[A, B](pa: Parser[A], pb: => Parser[B]): Parser[(A, B)]
 
   def map2
     [A, B, C]
-    (pa: Parser[A], pb: Parser[B])
+    (pa: Parser[A], pb: => Parser[B])
     (f: (A, B) => C):
     Parser[C] =
     product(pa, pb).map { case (a, b) => f(a, b) }
@@ -51,6 +54,20 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
     if (n < 1) succeed(List.empty)
     else map2(p, listOfN(n - 1, p))(listCons)
 
+  def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B]
+
+  /**
+  Parses an integer followed by the same number of 'a' characters as the
+  parsed integer.
+
+  Returns the count of the parsed 'a' characters.
+  */
+  def listOfNAs: Parser[Int] =
+    for {
+      numStr <- "[1-9][0-9]*".r
+      as <- listOfN(numStr.toInt, string("a"))
+    } yield as.length
+
   case class ParserOps[A](p: Parser[A]) {
     def |[B >: A](p2: Parser[B]) = self.or(p, p2)
     def or[B >: A](p2: => Parser[B]) = self.or(p, p2)
@@ -60,6 +77,7 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
     def many1: Parser[List[A]] = self.many1(p)
     def map[B](f: A => B): Parser[B] = self.map(p)(f)
     def slice: Parser[String] = self.slice(p)
+    def flatMap[B](f: A => Parser[B]): Parser[B] = self.flatMap(p)(f)
   }
 
   object Laws {
