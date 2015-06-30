@@ -3,7 +3,8 @@ package fpinscala.parsing
 import java.util.regex._
 import scala.util.matching.Regex
 
-trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call methods of trait
+// so inner classes may call methods of trait
+trait Parsers[ParseError, Parser[+_]] { self =>
   private def listCons[A](a: A, as: List[A]): List[A] = a :: as
 
   def run[A](p: Parser[A])(input: String): Either[ParseError, A]
@@ -39,7 +40,11 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
 
   def or[A](p1: Parser[A], p2: => Parser[A]): Parser[A]
 
-  def product[A, B](pa: Parser[A], pb: => Parser[B]): Parser[(A, B)]
+  def product[A, B](pa: Parser[A], pb: => Parser[B]): Parser[(A, B)] =
+    for {
+      a <- pa
+      b <- pb
+    } yield (a, b)
 
   def map2
     [A, B, C]
@@ -47,6 +52,16 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
     (f: (A, B) => C):
     Parser[C] =
     product(pa, pb).map { case (a, b) => f(a, b) }
+
+  def map2ViaFlatMap
+  [A, B, C]
+  (pa: Parser[A], pb: => Parser[B])
+    (f: (A, B) => C):
+  Parser[C] =
+    for {
+      a <- pa
+      b <- pb
+    } yield f(a, b)
 
   def slice[A](p: Parser[A]): Parser[String]
 
@@ -80,6 +95,12 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
     def flatMap[B](f: A => Parser[B]): Parser[B] = self.flatMap(p)(f)
   }
 
+  private def unbiasRight[A, B, C](triple: (A, (B, C))): (A, B, C) =
+    (triple._1, triple._2._1, triple._2._2)
+
+  private def unbiasLeft[A, B, C](triple: ((A, B), C)): (A, B, C) =
+    (triple._1._1, triple._1._2, triple._2)
+
   object Laws {
     import org.scalacheck.{ Gen, Prop }
     import Prop._
@@ -94,11 +115,20 @@ trait Parsers[ParseError, Parser[+_]] { self => // so inner classes may call met
       forAll { (a: String, in: String) =>
         run(succeed(a))(in) == Right(a)
       }
+
+    def productLaw
+    [A, B, C]
+    (pa: Parser[A], pb: Parser[B], pc: Parser[C])
+    (in: Gen[String]):
+    Prop =
+      equal(
+        ((pa ** pb) ** pc).map(unbiasLeft),
+        (pa ** (pb ** pc)).map(unbiasRight)
+      )(in)
   }
 }
 
 case class Location(input: String, offset: Int = 0) {
-
   lazy val line = input.slice(0,offset+1).count(_ == '\n') + 1
   lazy val col = input.slice(0,offset+1).reverse.indexOf('\n')
 
