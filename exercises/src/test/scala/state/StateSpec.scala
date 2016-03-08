@@ -236,7 +236,7 @@ class StateSpec extends Specification with ScalaCheck {
           Turn, Turn,
           Coin, Coin
         )
-      ).run(machine)._1 mustEqual (11 -> 5)
+      ).run(machine)._1 mustEqual (12 -> 5)
     }
 
     "succeed at running simulation in book" in {

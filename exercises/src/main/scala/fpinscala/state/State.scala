@@ -138,7 +138,21 @@ sealed trait Input
 case object Coin extends Input
 case object Turn extends Input
 
-case class Machine(locked: Boolean, candies: Int, coins: Int)
+case class Machine(locked: Boolean, candies: Int, coins: Int) {
+  def input(i: Input): Machine =
+    (i, this) match {
+      case (_, Machine(_, 0, _)) => this
+      case (Coin, Machine(true, candies, coins)) =>
+        Machine(false, candies, coins + 1)
+
+      case (Turn, Machine(false, candies, coins)) =>
+        Machine(true, candies - 1, coins)
+
+      case (Turn, Machine(true, _, _)) => this
+      case (Coin, Machine(false, candies, coins)) =>
+        Machine(false, candies, coins + 1)
+    }
+}
 
 object State {
   /*
@@ -163,28 +177,14 @@ object State {
       sa.map2(sb) { (a, b) => a :: b }
     }
 
-  def simulateMachine(
-    inputs: List[Input]
-  ): State[Machine, (Int, Int)] =
+  def simulateMachine(inputs: List[Input]): State[Machine, (Int, Int)] =
     for {
-      _ <-
-        sequence {
-          inputs.map { i =>
-            modify { m: Machine =>
-              (i, m) match {
-                case (_, Machine(_, 0, _)) => m
-                case (Coin, Machine(true, candies, coins)) =>
-                  Machine(false, candies, coins + 1)
-                case (Turn, Machine(false, candies, coins)) =>
-                  Machine(true, candies - 1, coins)
-                case (Turn, Machine(true, _, _)) => m
-                case (Coin, Machine(false, _, _)) => m
-              }
-            }
-          }
+      _ <- sequence {
+        inputs map { i: Input =>
+          modify { m: Machine => m input i }
         }
+      }
 
       m <- get
     } yield (m.coins, m.candies)
 }
-
